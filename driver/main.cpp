@@ -99,6 +99,13 @@ void send_command(unsigned char command)
 	hid_write(device, hid_buffer, 2);
 }
 
+void getPassword(std::string* password)
+{
+	setEcho(false);
+	std::getline(std::cin, *password);
+	setEcho(true);
+}
+
 int main(int argc, char* argv[])
 {
 	// Init HID API
@@ -182,21 +189,74 @@ int main(int argc, char* argv[])
 				}
 				else if (c == 'w')
 				{
-					send_command(COMMAND_WRITE);
+					std::string primaryPassword;
+					std::string primaryPasswordAgain;
+					std::string secondaryPassword;
+					std::string secondaryPasswordAgain;
 					
-					/*
-					printf("Enter your primary password: ");
-					printf("\n");
-					printf("Enter your primary password again: ");
-					printf("\n");
-					printf("Enter your secondary password: ");
-					printf("\n");
-					printf("Enter your secondary password again: ");
-					printf("\n");
-					printf("Are you sure you want to overwrite your NFC tag? y/n");
-					printf("\n");
-					printf("Hold your tag up to the reader");
-					printf("\n");*/
+					std::cout << "Enter your primary password: ";
+					getPassword(&primaryPassword);
+					std::cout << std::endl;
+					
+					std::cout << "Enter your primary password again: ";
+					getPassword(&primaryPasswordAgain);
+					std::cout << std::endl;
+					
+					if (primaryPassword != primaryPasswordAgain)
+					{
+						std::cout << "Your primary passwords didn't match" << std::endl;
+					}
+					else
+					{
+						std::cout << "Enter your secondary password: ";
+						getPassword(&secondaryPassword);
+						std::cout << std::endl;
+						
+						std::cout << "Enter your secondary password again: ";
+						getPassword(&secondaryPasswordAgain);
+						std::cout << std::endl;
+						
+						if (secondaryPassword != secondaryPasswordAgain)
+						{
+							std::cout << "Your secondary passwords didn't match" << std::endl;
+						}
+						else
+						{
+							uint16_t passwordLength = (uint16_t)primaryPassword.length();
+							
+							hid_buffer[0] = 0;
+							hid_buffer[1] = COMMAND_WRITE;
+							hid_buffer[2] = passwordLength & 0xFF;
+							hid_buffer[3] = (passwordLength >> 8) & 0xFF;
+							hid_write(device, hid_buffer, 4);
+							
+							int packetCount = passwordLength / PACKET_SIZE + 1;
+							
+							uint16_t currentByte = 0;
+							
+							hid_buffer[0] = 0;
+							for (int i = 0; i < packetCount; ++i)
+							{
+								uint8_t currentPacketSize = 1;
+								for (int j = 0; j < PACKET_SIZE; ++j)
+								{
+									if (currentByte >= passwordLength)
+									{
+										break;
+									}
+									
+									hid_buffer[1 + j] = primaryPassword[currentByte];
+									++currentPacketSize;
+									++currentByte;
+								}
+								
+								hid_write(device, hid_buffer, currentPacketSize);
+							}
+							
+							std::cout << "Hold your tag up to the reader" << std::endl;
+							
+						}
+					}
 				}
 				else
 				{
@@ -218,6 +278,7 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
+				/*
 				if (hid_buffer[2] & MESSAGE_TAG_DETECTED)
 				{
 					std::cout << "Detected NFC tag ";
@@ -240,18 +301,19 @@ int main(int argc, char* argv[])
 				{
 					
 				}
-				/*
+				*/
+				
 				// Packet received
 				printf("\nReceived %d bytes:\n", size);
 				for (int i = 0; i < size; ++i)
 				{
-					printf("%02X ", buffer[i] & 255);
+					printf("%02X ", hid_buffer[i]);
 					if (i % 16 == 15 && i < size - 1)
 						printf("\n");
 				}
 				
 				printf("\n");
-				*/
+				
 			}
 		}
 		
